@@ -1,0 +1,11 @@
+This is a twitter clone (with some features) using redis and express
+
+i prefered to use a separated front end instead of express templates.
+run index.js, program starts on /
+
+DB Structure
+
+Redis
+hash -> {users} [UserName userid]
+incr -> userID
+hash -> {user:userid} [hash, username] 
