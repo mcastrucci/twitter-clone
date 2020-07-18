@@ -99,12 +99,11 @@ body {
 
 .tweets__post--wrapper {
     display: flex;
-    flex-direction: column;
-    
+    flex-direction: column;  
 }
 
 .tweets__post--wrapper .submit--container, textarea{
-   width: 100%;
+   width: calc((100% - (40px * 2))); /*100% - 40 padding each side*/
    margin: 0px;
 }
 
@@ -133,9 +132,8 @@ body {
 
  .submit--button--container{
      width: 10%;
-     margin-right: 2rem;
-     
- }
+
+    }
  .submit--button{
      display: inline-block;
      border-radius: 100px;
@@ -157,26 +155,13 @@ body {
     flex-direction: row;
     justify-content: space-around;
     width: 40%;
+    margin-left: 10%;
 }
 
 .submit--tools svg{
     height: 25px;
     color: rgba(29,161,242,1.00);
     fill: currentcolor;
-}
-
-.tweets--container {
-     position: relative;
- }
-.tweets--container::before{
-    position: absolute;
-    margin-top: 5px;
-    content: " ";
-    width: 100vw;
-    background-color: rgb(230, 236, 240);
-    height: 10px;
-    border: 0 solid black;
-    padding: 2px;
 }
 
 /* util CSs*/
@@ -202,6 +187,8 @@ body {
     margin-left: 20px;
     padding: 0 15px;
     overflow: auto;
+    background-color: rgba(195, 195, 195, .1);
+    border-radius: 15px;
 }
 
 .people_to_follow--wrapper h2{
@@ -274,3 +261,75 @@ body {
     align-items: center;
     padding: 2.5rem;
 }
+
+/* user posts section */
+.tweets--container{
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.tweets--container::before{
+   margin-top: 5px;
+   content: " ";
+   background-color: rgb(230, 236, 240);
+   height: 10px;
+   border: 0 solid black;
+   padding: 2px;
+}
+
+.tweet__card{
+    text-align: center;
+    border: 1px rgb(230, 236, 240) solid;
+    border-top: none;
+    display: grid;
+    grid-template-columns: 1fr 8fr;
+    grid-template-rows: 1fr;
+    width: auto;
+    cursor: pointer;
+    padding: 40px;
+    justify-items: center;
+}
+
+.tweet__card:hover{
+    background-color: rgba(0, 0, 0, .0500);
+}
+.tweet__card--picture img{
+    border-radius: 200px;
+}
+
+.tweet__card--picture{
+    border-radius: 200px;
+    justify-self: right;
+    margin-right: 10px;
+}
+
+.tweet__card--picture:hover{
+  opacity: .8;
+}
+
+.tweet__card__tweet{
+    justify-self: left;
+    display: grid;
+    grid-template-rows: 1fr 3fr 1fr;
+    grid-template-columns: 1fr;
+    align-items: center;
+    justify-items: left;
+    text-align: left;
+}
+
+/*
+                <div class="tweet__card">
+                    <div class="tweet__card--picture"></div>
+                    <div class="tweet__card__tweet">
+                        <div class="tweet__card__tweet__name">
+                            Name 3
+                        </div>
+                        <div class="tweet__card__tweet_message">
+                            lorem ipsum
+                        </div>
+                        <div class="tweet__card__tweet__icons"> 
+                        </div>
+                    </div>
+                </div>
+*/

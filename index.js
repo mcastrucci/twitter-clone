@@ -289,7 +289,7 @@ app.post("/signin", async (req, res)=>{
     async function saveSessionAndRedirectToDashboard(userID) {
         req.session.userid = userID;
         req.session.save();
-        res.status(200).sendFile(__exposedDir + "dashboard/home.html");
+        res.status(200).redirect("/");
     };
 })
 
