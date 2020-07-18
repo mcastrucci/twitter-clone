@@ -13,7 +13,22 @@ document.addEventListener("DOMContentLoaded", (event)=>{
     }).catch((err)=>{
         console.log("failed to get followers");
     })
+    const feedUrl = "/get-tweets"
 
+    /*
+    const feedRequest = new Request(feedUrl, {
+        headers: new Headers({
+        'Content-Type': 'application/json'
+    })})
+        
+    fetch(feedRequest)
+    .then(result => result.json())
+    .then(response => {
+        console.log(response.feed);
+    }).catch((err)=>{
+        console.log("failed to get tweets");
+    })
+    */
     const addPeopleToFollow = (users) => {
         let template = document.querySelector(".people-to-follow-template");
         let right_panel = document.querySelector(".people_to_follow--container");

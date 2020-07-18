@@ -1,13 +1,20 @@
 const express = require("express");
 const app = express();
 
-
+const { promisify } = require('util')
 const bcrypt = require('bcrypt');
 const session = require('express-session');
 const RedisStore = require('connect-redis')(session);
 
 const redis = require('redis');
 const client = redis.createClient();
+
+
+const ahget = promisify(client.hget).bind(client)
+const asmembers = promisify(client.smembers).bind(client)
+const ahkeys = promisify(client.hkeys).bind(client)
+const aincr = promisify(client.incr).bind(client)
+const alrange = promisify(client.lrange).bind(client)
 
 
 const saltRounds = 10;
@@ -40,48 +47,115 @@ app.get("/", (req, res) => {
         res.sendFile(__exposedDir + "signin/signin.html");
 })
 
-app.get("/getFollowersSugestion", (req, res) => {
+app.get("/getFollowersSugestion", async (req, res) => {
     if(!req.session.userid){
         res.redirect("/");
         return;
     }
 
+    console.log("/getFollowersSugestion --- getting people to follow ---");
+    try{
+        const allUsers = await getAllUsers();  // we get all users from the DB
+    
+        //we will need the userName from the id of the session
+        const userName = await getUserName(req.session.userid);
+    
+        //now that we have the user name, lets get the followers
+        const followSugestion = await getUsersToFollow(userName, allUsers);
+    
+        //we return that list
+        await res.send(followSugestion);
+    }catch (ex){
+        res.status(500).send("failed to get sugested people to follow");
+    }
+})
+
+
+
+const getFollowedUsers = (userName, users) => new Promise ((resolve, reject) => {
+    client.smembers(`following:${userName.trim()}`, (err, following) => {
+        if (err)
+            reject(err);
+        let returningList = [];
+        //now lets iterate over the users and remove the ones that should not be there
+        for(item of users){
+            let push = true;
+            if(!following.includes(item))
+                push = false;
+            if (item === userName)
+                push = false;
+
+            if (push)
+                returningList.push(item);
+        }
+        resolve({users: returningList})
+    })
+})
+
+app.get("/get-tweets", (req, res) => {
+    if(!req.session.userid){
+        res.redirect("/");
+        return;
+    }
+
+    let tweets = [];
+    
     client.hkeys("users", (err, users)=> {
         if (err){
             res.status(500).send("failed to get people to follow");
             return;
         }
-        let returningList = [];
-        //first we will get the name of the curren user
-        getUserName(req.session.userid).then((userName)=>{
-            //now that we have the user name, lets get the followers
-            console.log(userName);
-            client.smembers(`following:${userName.trim()}`, (err, following) => {
-                if (err)
-                    res.status(500).send("error while getting following users");
-                    
-                //now lets iterate over the users and remove the ones that should not be there
-                console.log(`following:${userName}` ,following);
-                for(item of users){
-                    console.log(userName, item, userName !== item);
-                    let push = true;
-                    if(following && following.includes(item))
-                        push = false;
-                    if (item === userName)
-                        push = false;
 
-                    if (push)
-                        returningList.push(item);
+        console.log("getting tweets");
+        //in order to get tweets, first lets get the name of the user
+        getUserName(req.session.userid).then((userName)=>{
+            console.log("tweets -- userName", userName);
+            //now that we have the user name, lets get the followers
+            console.log(userName, users);
+            getFollowedUsers(userName, users).then(followingUsers=>{
+                console.log("following users--" , followingUsers)
+                //now that we have the people that this user follow, lets get the tweets of each
+                for(user of followingUsers.users){
+                    //to make this, we will need the id of the user
+                    console.log("iterating over following users");
+                    client.hget("users", user, (err, userID)=> { //first we get the user ID from DB if it does not exist, we redirect to root
+                        console.log("got the id of the followed user", userID);
+                        if (err){
+                            res.status(500).send("something went wrong, please try again in some minutes");
+                            return;
+                        }
+                        //now we get all posts of the user
+                        client.hgetall(`post:${userID}`, (err, listOfPosts) => {
+                            console.log("current following user list of post", listOfPosts);
+                            //we iterate over the posts
+                            if (listOfPosts){
+                                for (post of listOfPosts){
+                                    let tempPost = {
+                                        user: user,
+                                        tweet: post.message,
+                                        time: post.timestamp
+                                    }
+                                    tweets.push(tempPost);
+                                }
+                            }
+                        })
+                    });
                 }
-                res.send({users: returningList});
+
+                res.send(JSON.stringify({feed: {
+                    tempPost
+                }}));
+
+            }).catch(err =>{
+                res.status(500).send("failed while getting user name");
             })
         }).catch((err)=>{
             console.log(err);
             res.status(500).send("failed while getting user name");
             return;
-        })
-        
-    });
+        });
+
+    });  
 })
 
 app.post("/post", (req, res) => {
@@ -210,13 +284,31 @@ app.post("/signin", (req, res)=>{
     };
 })
 
-const getUserName = (userID) => new Promise ((resolve, reject) => {
-    console.log(userID);
-    client.hget(`user:${userID}`, "username", (err, currentUserName) =>{
-        if (err)
-            reject("error while getting user name");
-        resolve(currentUserName);
-    })
-});
-
 app.listen(3000, () => console.log("server running"));
+
+//Database Methods
+
+const getAllUsers = async () => await ahkeys("users");
+
+const getUserName = async (userID) => ahget(`user:${userID}`, "username");
+
+const getUsersToFollow = async (userName, users)  => {
+    //first we get all people that the current user is following
+    const currentUserFollowedPeople = await asmembers (`following:${userName.trim()}`); 
+    console.log("---current user is following: ", currentUserFollowedPeople);
+
+    let returningList = [];
+    //now lets iterate over the users and remove the ones that should not be there
+
+    for(item of users){
+        let push = true;
+        if(currentUserFollowedPeople && currentUserFollowedPeople.includes(item))
+            push = false;
+        if (item === userName)
+            push = false;
+
+        if (push)
+            returningList.push(item);
+    }
+    return {users: returningList};
+}
