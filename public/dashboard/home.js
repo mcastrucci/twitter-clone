@@ -79,6 +79,6 @@ document.addEventListener("DOMContentLoaded", (event)=>{
         text.innerHTML = error;
         setTimeout (()=>{
             document.querySelector(".error-modal").classList.add("hidden");
-        },5000);
+        },10000);
     }
 })
