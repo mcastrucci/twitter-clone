@@ -6,6 +6,10 @@ run index.js, program starts on /
 DB Structure
 
 Redis
-hash -> {users} [UserName userid]
-incr -> userID
-hash -> {user:userid} [hash, username] 
+value SESS:<uniqueSessionID>
+Set following:<username> -> store users that the current user is following
+set followers:<username> -> store the users that are following the current user
+value postid -> an incr of postIds
+hash post:<postid> -> userid, message and timestamp
+hash user:<userid> -> password hash and username
+hash users -> k/v of userid and username
