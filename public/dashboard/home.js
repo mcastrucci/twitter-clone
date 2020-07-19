@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", (event)=>{
     })
     const feedUrl = "/get-tweets"
 
-    /*
+    
     const feedRequest = new Request(feedUrl, {
         headers: new Headers({
         'Content-Type': 'application/json'
@@ -24,11 +24,29 @@ document.addEventListener("DOMContentLoaded", (event)=>{
     fetch(feedRequest)
     .then(result => result.json())
     .then(response => {
-        console.log(response.feed);
+        console.log(response.response);
+        addTweetToDashboard(response.response);
     }).catch((err)=>{
         console.log("failed to get tweets");
     })
-    */
+
+    const addTweetToDashboard = (tweets) => {
+        let template = document.querySelector(".tweet-card-template");
+        let tweet_container = document.querySelector(".tweets--container");
+        let element = template.content.querySelector(".tweet__card");
+
+        for (let tweet of tweets){ 
+            let a = element.cloneNode(true);
+            let name = a.querySelector(".tweet__card__tweet__name");
+            let message = a.querySelector(".tweet__card__tweet_message");
+
+            name.innerHTML = `${tweet.author} - ${tweet.timeString} ago`;
+            message.innerHTML = tweet.message;
+            tweet_container.appendChild(a);    
+        }
+    }
+
+    
     const addPeopleToFollow = (users) => {
         let template = document.querySelector(".people-to-follow-template");
         let right_panel = document.querySelector(".people_to_follow--container");

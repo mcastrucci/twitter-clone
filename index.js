@@ -8,6 +8,7 @@ const RedisStore = require('connect-redis')(session);
 
 const redis = require('redis');
 const client = redis.createClient();
+const { formatDistance } = require('date-fns')
 
 
 const ahget = promisify(client.hget).bind(client)
@@ -82,71 +83,48 @@ app.get("/getFollowersSugestion", async (req, res) => {
     }
 })
 
+/*@Returns the tweets that the user should display in his dashboard
+*/
+app.get("/get-tweets", async (req, res) => {
+    
+    //this 
+    const currentUserName = await getUserName(req.session.userid);
+    const allUsers = await getAllUsers();
 
-app.get("/get-tweets", (req, res) => {
-    if(!req.session.userid){
-        res.redirect("/");
-        return;
+    console.log("getting tweets for user ", currentUserName);
+
+    try {
+        const timeline = []
+        const posts = await alrange(`timeline:${currentUserName}`, 0, 10); //just 10
+        
+        if (posts) { //only if there is something to see
+            console.log(posts)
+            for (post of posts){
+                //with this neat thing we create labels like "10 minutes ago"
+                const timestamp = await ahget(`post:${post}`, 'timestamp')
+                const timeString = formatDistance(
+                new Date(),
+                new Date(parseInt(timestamp))
+                )
+                const postAuthorID = await ahget(`post:${post}`, 'userid'); //this is actually the id
+                const postAuthorName = await ahget(`user:${postAuthorID}`, 'username');
+
+                author: await ahget(`post:${post}`, 'username'),
+                timeline.push({
+                    message: await ahget(`post:${post}`, 'message'),
+                    author: postAuthorName, //this is actually the id
+                    timeString: timeString,
+                })
+            }
+            res.status(200).send(JSON.stringify({response: timeline}))
+        } else {
+            res.status(200).send(JSON.stringify({response: "no tweets for this user"}));
+        }
+    }catch (ex) {
+        console.log("failed to get user timeline", ex);
+        res.status(500).send(JSON.stringify({response: ex}));
     }
 
-    let tweets = [];
-    
-    client.hkeys("users", (err, users)=> {
-        if (err){
-            res.status(500).send("failed to get people to follow");
-            return;
-        }
-
-        console.log("getting tweets");
-        //in order to get tweets, first lets get the name of the user
-        getUserName(req.session.userid).then((userName)=>{
-            console.log("tweets -- userName", userName);
-            //now that we have the user name, lets get the followers
-            console.log(userName, users);
-            getFollowedUsers(userName, users).then(followingUsers=>{
-                console.log("following users--" , followingUsers)
-                //now that we have the people that this user follow, lets get the tweets of each
-                for(user of followingUsers.users){
-                    //to make this, we will need the id of the user
-                    console.log("iterating over following users");
-                    client.hget("users", user, (err, userID)=> { //first we get the user ID from DB if it does not exist, we redirect to root
-                        console.log("got the id of the followed user", userID);
-                        if (err){
-                            res.status(500).send("something went wrong, please try again in some minutes");
-                            return;
-                        }
-                        //now we get all posts of the user
-                        client.hgetall(`post:${userID}`, (err, listOfPosts) => {
-                            console.log("current following user list of post", listOfPosts);
-                            //we iterate over the posts
-                            if (listOfPosts){
-                                for (post of listOfPosts){
-                                    let tempPost = {
-                                        user: user,
-                                        tweet: post.message,
-                                        time: post.timestamp
-                                    }
-                                    tweets.push(tempPost);
-                                }
-                            }
-                        })
-                    });
-                }
-
-                res.send(JSON.stringify({feed: {
-                    tempPost
-                }}));
-
-            }).catch(err =>{
-                res.status(500).send("failed while getting user name");
-            })
-        }).catch((err)=>{
-            console.log(err);
-            res.status(500).send("failed while getting user name");
-            return;
-        });
-
-    });  
 })
 
 app.post("/post", async (req, res) => {
@@ -163,6 +141,24 @@ app.post("/post", async (req, res) => {
                 if (err)
                     throw err; //if something fails
             });
+            //now lets create the timeline
+            client.lpush(`timeline:${userName}`, nextPostId);
+
+            try {
+                //now we need to add this post to each follower timeline
+                const followers = await getFollowersForCurrentUser(userName);
+                console.log("current user followers: ", followers);
+                //we iterate over each follower and add the post to his timeline
+
+                if(followers){ //only if there is followers
+                    for (follower of followers) {
+                        client.lpush(`timeline:${follower}`, nextPostId);
+                    }
+                }
+            } catch (ex) {
+                console.log("something went wrong while adding post to followers timelines");
+            }
+
             console.log(`user ${userId} - ${userName} posted:  ${user_tweet}`);
             // now that the post is done we redirect user to the dashboard /TODO - show a message to the user
             await res.redirect("/");
@@ -208,22 +204,24 @@ app.post("/follow", async (req, res) =>{
                 { response: `you are now following ${userToFollow}`}
             ));
         } catch(Ex) {
-            res.status(500).send("failing while following selected user, try again later");
+            console.log(Ex);
+            res.status(500).send(JSON.stringify({response: "failing while following selected user, try again later"}));
         }          
     } else {
         res.status(400).send("bad request, please, try again");
         return;
     }
 
-    const followUser = (currentUserName, userToFollow) => new Promise((resolve, reject) =>{
+    function followUser (currentUserName, userToFollow) {
         client.sadd(`following:${currentUserName}`, userToFollow, err => {
-            reject(err);
+            if (err)
+                throw err;
         });
         client.sadd(`followers:${userToFollow}`, currentUserName, err => {
-            reject(err);
+            if (err)
+                throw err;
         });
-        resolve();
-    })
+    }
 })
 
 app.post("/signin", async (req, res)=>{
@@ -342,3 +340,7 @@ const getFollowedUsersForCurrentUser = async (userName, users) => {
     }
     return {users: returningList}
 }
+
+/*get the users that are following the current user
+*/
+const getFollowersForCurrentUser = async (currentUserName) => await asmembers(`followers:${currentUserName}`);
