@@ -15,4 +15,10 @@ hash user:<userid> -> password hash and username
 hash users -> k/v of userid and username
 
 
+![image](https://user-images.githubusercontent.com/33734490/87970069-9b263180-ca99-11ea-9a53-877315120134.png)
+
+
+
+
+
 ![image](https://user-images.githubusercontent.com/33734490/87969305-40d8a100-ca98-11ea-9cf2-00af4c31c3e6.png)
